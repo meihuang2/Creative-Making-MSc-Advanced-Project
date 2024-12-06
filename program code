@@ -1,0 +1,168 @@
+#include "HPD482.h" // pinter 
+#include <Adafruit_NeoPixel.h> // led library
+HPD482 printer = HPD482(); 
+
+#define trig A2   // ultrasonic trig pin
+ #define echo A1      //  ultrasonic echo pin
+
+#define button A0     // button pin
+
+#define led1 A3               // WS2812 1 
+#define number1 7     // WS281 number
+#define led2 A4        
+#define number2 7         
+#define led3 A5            
+#define number3 7 
+       
+int buzzer=11;
+
+Adafruit_NeoPixel pixels1(number1, led1, NEO_GRB + NEO_KHZ800); 
+Adafruit_NeoPixel pixels2(number2, led2, NEO_GRB + NEO_KHZ800); 
+Adafruit_NeoPixel pixels3(number3, led3, NEO_GRB + NEO_KHZ800); 
+
+  unsigned int buttonstatus = 0;
+long duration;          
+int  distance;                
+ 
+void setup() {
+  pinMode(trig,  OUTPUT); 
+  pinMode(echo,  INPUT);
+Serial.begin(9600);        
+  pinMode(button, INPUT_PULLUP); 
+  pixels1.begin();        //  WS2812 initial 
+   pixels2.begin();                 
+   pixels3.begin();                  
+ pinMode(buzzer,OUTPUT);
+ }
+ 
+void loop() {
+
+    buttonstatus = digitalRead(button); //detect buttin
+     pixels1.clear(); //clear leds
+      pixels2.clear(); 
+      pixels3.clear(); 
+    pixels1.show();     // refresh
+    pixels2.show();  
+    pixels3.show();  
+
+  if (buttonstatus == 0) { 
+Serial.println("program begin"); 
+
+  delay(60000); // wait 1 min
+    tone(buzzer, 1000); 
+    delay(10000);       // keep10 s
+  noTone(buzzer);        // step
+
+lightup(pixels1, "one minutes"); 
+ // secondtime
+  delay(60000); // wait 1 min
+    tone(buzzer, 1000); 
+    delay(10000);       // keep10 s
+  noTone(buzzer);        // step
+
+lightup(pixels2, "two minutes");
+
+    // 
+   delay(60000); // wait 1 min
+    tone(buzzer, 1000); 
+    delay(10000);       // keep10 s
+  noTone(buzzer);        // step
+
+lightup(pixels3, "three minutes");
+ 
+    // detect if all led light up red，start to print
+    if (allRed()) {
+      Printing();
+    }
+  }
+}
+
+// detect distance ahd light up
+void lightup(Adafruit_NeoPixel& pixels, const char* timeLabel) { 
+   Serial.print("detert the distance（");
+  Serial.print(timeLabel);
+  Serial.println("）...");
+ bool under2m = false;
+
+  for (int i = 0; i < 30; i++) { // detect each second， last 20 mintues
+    measure(); // measure distance
+    if (distance > 0 && distance < 200) { 
+      under2m = true; 
+      break; // end the loop
+ }
+             delay(1000); 
+
+  }
+
+  // light up according to the distance
+  if (under2m) {
+    color(pixels, 0, 0, 255); // light up blue
+      Serial.print(timeLabel);
+    Serial.println("distance inside 2m，blue！");
+  } else {
+    color(pixels, 255, 165, 0); // ligjt up red
+    Serial.print(timeLabel);
+ Serial.println("distance blew 2m，red！"); 
+  }
+
+}
+
+void measure() { 
+  // start to detect the distance
+  digitalWrite(trig, LOW); 
+  delayMicroseconds(10);  
+  digitalWrite(trig,HIGH); 
+  delayMicroseconds(20);
+  digitalWrite(trig, LOW);
+
+    duration = pulseIn(echo, HIGH); // read 
+distance = duration * 0.034 / 2;
+  Serial.print("distance:"); 
+ Serial.print(distance);
+Serial.println("cm"); 
+}
+
+// set  WS2812 coloer
+void color(Adafruit_NeoPixel& pixels, int r, int g, int b) {
+  for (int i = 0; i < pixels.numPixels(); i++) { 
+    pixels.setPixelColor(i, pixels.Color(r, g, b));
+  }
+  pixels.show();  //send to leds
+
+}
+
+//check if all red
+bool allRed() {
+  return checkcolor(pixels1, 255, 165, 0) && // check each leds
+           checkcolor(pixels2, 255, 165, 0) &&
+           checkcolor(pixels3, 255, 165, 0);
+     }
+
+bool checkcolor(Adafruit_NeoPixel& pixels, int r, int g, int b) { 
+  for (int i = 0; i < pixels.numPixels(); i++) {
+    uint32_t color = pixels.getPixelColor(i);  // to get pixel color
+    int red = (color >> 16) & 0xFF;
+    int green = (color >> 8) & 0xFF;
+    int blue = color & 0xFF;
+
+
+    if (red != r || green != g || blue != b) {
+      return false;
+    }
+
+  }
+  return true;
+}
+
+
+void Printing() { 
+  Serial.println("all red， start printing");
+  printer.Print_SetDeep(8);//set the color depth
+  //printer.Print_Lines(5,2);
+  printer.Motor_Run(400,0);
+ printer.Print_SStr((u8*)"Proper rest revitalizes your mind, you're already amazing!",24,16);
+  
+  
+ printer.Motor_Run(800, 0); 
+
+}
